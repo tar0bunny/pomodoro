@@ -1,7 +1,14 @@
 import sys
-from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout
+from pathlib import Path
 
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QPushButton, QLabel, QFrame,
+    QVBoxLayout, QHBoxLayout,
+)
+
+ASSETS = Path(__file__).parent / "assets"
 FOCUS_SECONDS = 1500 # 25 mins
 BREAK_SECONDS = 300 # 5 mins
 
