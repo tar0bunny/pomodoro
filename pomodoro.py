@@ -12,6 +12,33 @@ ASSETS = Path(__file__).parent / "assets"
 FOCUS_SECONDS = 1500 # 25 mins
 BREAK_SECONDS = 300 # 5 mins
 
+# brand colors
+NAVY = "#1B2447"
+TWILIGHT = "#3D4A7A"
+LAVENDER = "#E8E6F0"
+BLOSSOM = "#E5B8CF"
+WHITE = "#FFFFFF"
+
+class Button(QPushButton):
+    def __init__(self, text, primary=True, parent=None):
+        super().__init__(text, parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(42)
+        bg, bg_hover = (BLOSSOM, "#eec6dc") if primary else (WHITE, "#f4f2f8")
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {bg};
+                color: {NAVY};
+                border: 2px solid {NAVY};
+                border-radius: 21px;
+                padding: 0 20px;
+                font-family: 'Century Gothic', 'Segoe UI', sans-serif;
+                font-weight: 600;
+                font-size: 14px;
+            }}
+            QPushButton:hover {{ background-color: {bg_hover}; }}
+            QPushButton:pressed {{ padding-top: 2px; }}
+        """)
 
 class PomodoroWindow(QWidget):
     def __init__(self):
