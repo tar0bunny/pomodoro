@@ -1,6 +1,6 @@
 """
 tar0bunny - Code & Chill Pomodoro
-A cozy PyQt6 pomodoro timer featuring a slowly bobbing pixel bunny,
+A cozy PyQt6 pomodoro timer with a centered clock,
 built in tar0bunny brand colors (Midnight Navy / Blossom Pink / Soft Lavender).
 
 Run with:
@@ -10,14 +10,12 @@ Run with:
 Folder layout expected:
     pomodoro.py
     assets/background.png
-    assets/bunny.png
 """
 
-import math
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, QUrl
+from PyQt6.QtCore import Qt, QTimer, QRectF, QUrl
 from PyQt6.QtGui import QPixmap, QPainter, QFont, QColor, QPainterPath, QFontDatabase
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QGraphicsDropShadowEffect, QMessageBox
 from PyQt6.QtMultimedia import QSoundEffect
@@ -42,7 +40,6 @@ SHADOW_COLOR_B = 71
 SESSION_SHADOW_ALPHA = 230
 TIME_SHADOW_ALPHA = 220
 PANEL_ALPHA = 90
-BUNNY_SHADOW_ALPHA = 70
 
 # timing
 FOCUS_MINUTES = 25
@@ -51,7 +48,6 @@ SECONDS_PER_MINUTE = 60
 FOCUS_SECONDS = FOCUS_MINUTES * SECONDS_PER_MINUTE
 BREAK_SECONDS = BREAK_MINUTES * SECONDS_PER_MINUTE
 TICK_INTERVAL_MS = 1000
-ANIMATION_INTERVAL_MS = 16
 
 # window
 WINDOW_TITLE = "tar0bunny \u2728 Code & Chill Pomodoro"
@@ -78,15 +74,14 @@ BUTTON_PRESSED_PADDING_TOP = 2
 
 # asset filenames
 BACKGROUND_FILENAME = "background.png"
-BUNNY_FILENAME = "bunny.png"
 CHIME_FILENAME = "chime.wav"
 CHIME_VOLUME = 0.9
 
 # error / dialog text
 ERROR_MESSAGE_HEADER = "tar0bunny Pomodoro couldn't load these image(s):\n  "
 ERROR_MESSAGE_FOOTER = (
-    "\n\nMake sure the 'assets' folder (with background.png and "
-    "bunny.png) sits in the SAME folder as pomodoro.py."
+    "\n\nMake sure the 'assets' folder (with background.png) sits in the "
+    "SAME folder as pomodoro.py."
 )
 MISSING_FILES_DIALOG_TITLE = "tar0bunny Pomodoro \u2014 missing files"
 
@@ -94,37 +89,37 @@ MISSING_FILES_DIALOG_TITLE = "tar0bunny Pomodoro \u2014 missing files"
 MODE_FOCUS = "focus"
 MODE_BREAK = "break"
 
-# bob animation
-BOB_AMPLITUDE = 10.0
-BOB_SPEED = 0.045
-BOB_IDLE_SPEED = 0.012
-BOB_IDLE_AMPLITUDE_RATIO = 0.35
+# time label geometry, centered in the window
+TIME_LABEL_OFFSET_X = 220
+TIME_LABEL_WIDTH = 440
+TIME_LABEL_HEIGHT = 90
+TIME_LABEL_Y = WINDOW_HEIGHT // 2 - TIME_LABEL_HEIGHT // 2
+TIME_SHADOW_BLUR_RADIUS = 18
 
-# session label geometry
+# gaps around the clock
+GAP_ABOVE_CLOCK = 40
+GAP_BELOW_CLOCK = 20
+GAP_ABOVE_BUTTONS = 30
+PANEL_PADDING = 30
+
+# session label geometry, stacked above the clock
 SESSION_LABEL_OFFSET_X = 180
-SESSION_LABEL_Y = 20
 SESSION_LABEL_WIDTH = 360
 SESSION_LABEL_HEIGHT = 48
+SESSION_LABEL_Y = TIME_LABEL_Y - SESSION_LABEL_HEIGHT - GAP_ABOVE_CLOCK
 SESSION_SHADOW_BLUR_RADIUS = 14
 SHADOW_OFFSET_X = 0
 SHADOW_OFFSET_Y = 2
 
-# time label geometry
-TIME_LABEL_OFFSET_X = 220
-TIME_LABEL_Y = 380
-TIME_LABEL_WIDTH = 440
-TIME_LABEL_HEIGHT = 90
-TIME_SHADOW_BLUR_RADIUS = 18
-
-# tagline geometry
+# tagline geometry, below the clock
 TAGLINE_TEXT = "Stay curious."
 TAGLINE_OFFSET_X = 150
-TAGLINE_Y = 463
 TAGLINE_WIDTH = 300
 TAGLINE_HEIGHT = 26
+TAGLINE_Y = TIME_LABEL_Y + TIME_LABEL_HEIGHT + GAP_BELOW_CLOCK
 
-# button row geometry
-BUTTON_ROW_Y = 508
+# button row geometry, below the tagline
+BUTTON_ROW_Y = TAGLINE_Y + TAGLINE_HEIGHT + GAP_ABOVE_BUTTONS
 START_BUTTON_OFFSET_X = 195
 START_BUTTON_WIDTH = 120
 RESET_BUTTON_OFFSET_X = 65
@@ -147,20 +142,13 @@ SESSION_LABEL_BREAK_TEXT = "Break Mode"
 # time formatting
 TIME_FORMAT = "{:02d}:{:02d}"
 
-# background panel geometry
+# background panel geometry, wraps session label through button row
 PANEL_OFFSET_X = 260
-PANEL_Y = 362
 PANEL_WIDTH = 520
-PANEL_HEIGHT = 195
+PANEL_Y = SESSION_LABEL_Y - PANEL_PADDING
+PANEL_BOTTOM = BUTTON_ROW_Y + BUTTON_HEIGHT + PANEL_PADDING
+PANEL_HEIGHT = PANEL_BOTTOM - PANEL_Y
 PANEL_BORDER_RADIUS = 28
-
-# bunny geometry
-BUNNY_WIDTH = 340
-BUNNY_Y = 95
-BUNNY_SHADOW_WIDTH_RATIO = 0.62
-BUNNY_SHADOW_BASE_HEIGHT = 18
-BUNNY_SHADOW_OFFSET_RATIO = 0.4
-BUNNY_SHADOW_Y_ADJUST = 6
 
 
 class Button(QPushButton):
@@ -202,15 +190,11 @@ class PomodoroWindow(QWidget):
 
         # assets
         bg_path = ASSETS / BACKGROUND_FILENAME
-        bunny_path = ASSETS / BUNNY_FILENAME
         self.bg_pixmap = QPixmap(str(bg_path))
-        self.bunny_pixmap = QPixmap(str(bunny_path))
 
         missing = []
         if self.bg_pixmap.isNull():
             missing.append(str(bg_path))
-        if self.bunny_pixmap.isNull():
-            missing.append(str(bunny_path))
         if missing:
             raise FileNotFoundError(
                 ERROR_MESSAGE_HEADER + "\n  ".join(missing) + ERROR_MESSAGE_FOOTER
@@ -234,15 +218,6 @@ class PomodoroWindow(QWidget):
         self.countdown_timer = QTimer(self)
         self.countdown_timer.timeout.connect(self.tick)
         self.countdown_timer.setInterval(TICK_INTERVAL_MS)
-
-        # bob animation state
-        self.bob_phase = 0.0
-        self.bob_amplitude = BOB_AMPLITUDE
-        self.bob_speed = BOB_SPEED
-        self.bob_idle_speed = BOB_IDLE_SPEED
-        self.anim_timer = QTimer(self)
-        self.anim_timer.timeout.connect(self.animate)
-        self.anim_timer.start(ANIMATION_INTERVAL_MS)
 
         self.build_ui()
 
@@ -378,14 +353,6 @@ class PomodoroWindow(QWidget):
         else:
             self.session_label.setText(SESSION_LABEL_BREAK_TEXT)
             self.mode_button.setText(MODE_BUTTON_FOCUS_SHORT_TEXT)
-
-    # bunny bob animation
-    def animate(self):
-        speed = self.bob_speed if self.running else self.bob_idle_speed
-        amp = self.bob_amplitude if self.running else self.bob_amplitude * BOB_IDLE_AMPLITUDE_RATIO
-        self.bob_phase += speed
-        self.current_bob_offset = amp * math.sin(self.bob_phase)
-        self.update()
 
     # painting
     def paintEvent(self, event):
