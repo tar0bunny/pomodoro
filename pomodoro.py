@@ -50,7 +50,7 @@ BREAK_SECONDS = BREAK_MINUTES * SECONDS_PER_MINUTE
 TICK_INTERVAL_MS = 1000
 
 # window
-WINDOW_TITLE = "tar0bunny \u2728 Code & Chill Pomodoro"
+WINDOW_TITLE = "tar0bunny Code & Chill Pomodoro"
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 580
 APP_STYLE = "Fusion"
@@ -83,7 +83,7 @@ ERROR_MESSAGE_FOOTER = (
     "\n\nMake sure the 'assets' folder (with background.png) sits in the "
     "SAME folder as pomodoro.py."
 )
-MISSING_FILES_DIALOG_TITLE = "tar0bunny Pomodoro \u2014 missing files"
+MISSING_FILES_DIALOG_TITLE = "tar0bunny Pomodoro missing files"
 
 # modes
 MODE_FOCUS = "focus"
@@ -128,10 +128,10 @@ MODE_BUTTON_OFFSET_X = 65
 MODE_BUTTON_WIDTH = 130
 
 # button text
-START_BUTTON_START_TEXT = "\u25b6  Start"
-START_BUTTON_PAUSE_TEXT = "\u23f8  Pause"
-RESET_BUTTON_TEXT = "\u21bb  Reset"
-MODE_BUTTON_BREAK_TEXT = "\U0001f375 Break"
+START_BUTTON_START_TEXT = "Start"
+START_BUTTON_PAUSE_TEXT = "Pause"
+RESET_BUTTON_TEXT = "Reset"
+MODE_BUTTON_BREAK_TEXT = "Break"
 MODE_BUTTON_BREAK_SHORT_TEXT = "Break"
 MODE_BUTTON_FOCUS_SHORT_TEXT = "Focus"
 
