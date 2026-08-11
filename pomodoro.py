@@ -1,103 +1,191 @@
+"""
+tar0bunny - Code & Chill Pomodoro
+A cozy PyQt6 pomodoro timer featuring a slowly bobbing pixel bunny,
+built in tar0bunny brand colors (Midnight Navy / Blossom Pink / Soft Lavender).
+
+Run with:
+    pip install PyQt6 --break-system-packages
+    python pomodoro.py
+
+Folder layout expected:
+    pomodoro.py
+    assets/background.png
+    assets/bunny.png
+"""
+
+import math
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QPixmap, QFont
-from PyQt6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QLabel, QFrame,
-    QVBoxLayout, QHBoxLayout,
-)
+from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, QUrl
+from PyQt6.QtGui import QPixmap, QPainter, QFont, QColor, QPainterPath, QFontDatabase
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QGraphicsDropShadowEffect, QMessageBox
+from PyQt6.QtMultimedia import QSoundEffect
 
 ASSETS = Path(__file__).parent / "assets"
 
 # brand colors
-NAVY = "#1B2447"
-TWILIGHT = "#3D4A7A"
-LAVENDER = "#E8E6F0"
-BLOSSOM = "#E5B8CF"
+NAVY = QColor("#1B2447")
+TWILIGHT = QColor("#3D4A7A")
+AIR_BLUE = QColor("#718CA0")
+LAVENDER = QColor("#E8E6F0")
+BLOSSOM = QColor("#E5B8CF")
+WHITE = QColor("#FFFFFF")
+
 BLOSSOM_HOVER = "#eec6dc"
-WHITE = "#FFFFFF"
-WHITE_HOVER = "#f4f2f8"
+SECONDARY_BUTTON_BG = "rgba(255,255,255,140)"
+SECONDARY_BUTTON_HOVER = "rgba(255,255,255,200)"
+
+SHADOW_COLOR_R = 27
+SHADOW_COLOR_G = 36
+SHADOW_COLOR_B = 71
+SESSION_SHADOW_ALPHA = 230
+TIME_SHADOW_ALPHA = 220
+PANEL_ALPHA = 90
+BUNNY_SHADOW_ALPHA = 70
 
 # timing
-FOCUS_SECONDS = 1500  # 25 mins
-BREAK_SECONDS = 300  # 5 mins
-INTERVAL = 1000
-
-# layout
-UI_MARGIN = 36
-SPACING = 18
-CARD_MARGIN_LEFT = 24
-CARD_MARGIN_TOP = 20
-CARD_MARGIN_RIGHT = 24
-CARD_MARGIN_BOTTOM = 20
-CARD_SPACING = 4
-BUTTON_ROW_SPACING = 12
+FOCUS_MINUTES = 25
+BREAK_MINUTES = 5
+SECONDS_PER_MINUTE = 60
+FOCUS_SECONDS = FOCUS_MINUTES * SECONDS_PER_MINUTE
+BREAK_SECONDS = BREAK_MINUTES * SECONDS_PER_MINUTE
+TICK_INTERVAL_MS = 1000
+ANIMATION_INTERVAL_MS = 16
 
 # window
-WINDOW_TITLE = "tar0bunny Pomodoro"
-WINDOW_WIDTH = 480
-WINDOW_HEIGHT = 560
+WINDOW_TITLE = "tar0bunny \u2728 Code & Chill Pomodoro"
+WINDOW_WIDTH = 1000
+WINDOW_HEIGHT = 580
 APP_STYLE = "Fusion"
 
 # fonts
 FONT_FAMILY = "Century Gothic"
-FONT_FAMILY_FALLBACK = "Segoe UI"
 FONT_FAMILY_SANS = "sans-serif"
-SESSION_FONT_SIZE = 15
-TIME_FONT_SIZE = 48
-TAGLINE_FONT_SIZE = 11
+LABEL_FONT_FAMILY = "Gabriola"
+SESSION_FONT_SIZE = 27
+TIME_FONT_SIZE = 56
+TAGLINE_FONT_SIZE = 13
 BUTTON_FONT_SIZE = 14
 
-# bunny image
-BUNNY_FILENAME = "bunny.png"
-BUNNY_SCALE_WIDTH = 180
-
-# button style
+# button geometry / style
 BUTTON_HEIGHT = 42
 BUTTON_BORDER_WIDTH = 2
 BUTTON_BORDER_RADIUS = 21
-BUTTON_PADDING_HORIZONTAL = 20
+BUTTON_PADDING_HORIZONTAL = 22
 BUTTON_FONT_WEIGHT = 600
 BUTTON_PRESSED_PADDING_TOP = 2
 
-# card style
-CARD_BORDER_WIDTH = 2
-CARD_BORDER_RADIUS = 24
+# asset filenames
+BACKGROUND_FILENAME = "background.png"
+BUNNY_FILENAME = "bunny.png"
+CHIME_FILENAME = "chime.wav"
+CHIME_VOLUME = 0.9
 
-# text
-SESSION_LABEL_FOCUS_TEXT = "Focus Time"
-SESSION_LABEL_BREAK_TEXT = "Break Time"
-TAGLINE_TEXT = "Stay curious."
-MODE_BUTTON_TO_BREAK_TEXT = "Switch to Break"
-MODE_BUTTON_TO_FOCUS_TEXT = "Switch to Focus"
-START_BUTTON_START_TEXT = "Start"
-START_BUTTON_PAUSE_TEXT = "Pause"
-RESET_BUTTON_TEXT = "Reset"
+# error / dialog text
+ERROR_MESSAGE_HEADER = "tar0bunny Pomodoro couldn't load these image(s):\n  "
+ERROR_MESSAGE_FOOTER = (
+    "\n\nMake sure the 'assets' folder (with background.png and "
+    "bunny.png) sits in the SAME folder as pomodoro.py."
+)
+MISSING_FILES_DIALOG_TITLE = "tar0bunny Pomodoro \u2014 missing files"
 
 # modes
 MODE_FOCUS = "focus"
 MODE_BREAK = "break"
 
+# bob animation
+BOB_AMPLITUDE = 10.0
+BOB_SPEED = 0.045
+BOB_IDLE_SPEED = 0.012
+BOB_IDLE_AMPLITUDE_RATIO = 0.35
+
+# session label geometry
+SESSION_LABEL_OFFSET_X = 180
+SESSION_LABEL_Y = 20
+SESSION_LABEL_WIDTH = 360
+SESSION_LABEL_HEIGHT = 48
+SESSION_SHADOW_BLUR_RADIUS = 14
+SHADOW_OFFSET_X = 0
+SHADOW_OFFSET_Y = 2
+
+# time label geometry
+TIME_LABEL_OFFSET_X = 220
+TIME_LABEL_Y = 380
+TIME_LABEL_WIDTH = 440
+TIME_LABEL_HEIGHT = 90
+TIME_SHADOW_BLUR_RADIUS = 18
+
+# tagline geometry
+TAGLINE_TEXT = "Stay curious."
+TAGLINE_OFFSET_X = 150
+TAGLINE_Y = 463
+TAGLINE_WIDTH = 300
+TAGLINE_HEIGHT = 26
+
+# button row geometry
+BUTTON_ROW_Y = 508
+START_BUTTON_OFFSET_X = 195
+START_BUTTON_WIDTH = 120
+RESET_BUTTON_OFFSET_X = 65
+RESET_BUTTON_WIDTH = 120
+MODE_BUTTON_OFFSET_X = 65
+MODE_BUTTON_WIDTH = 130
+
+# button text
+START_BUTTON_START_TEXT = "\u25b6  Start"
+START_BUTTON_PAUSE_TEXT = "\u23f8  Pause"
+RESET_BUTTON_TEXT = "\u21bb  Reset"
+MODE_BUTTON_BREAK_TEXT = "\U0001f375 Break"
+MODE_BUTTON_BREAK_SHORT_TEXT = "Break"
+MODE_BUTTON_FOCUS_SHORT_TEXT = "Focus"
+
+# session label text
+SESSION_LABEL_FOCUS_TEXT = "Focus Mode"
+SESSION_LABEL_BREAK_TEXT = "Break Mode"
+
 # time formatting
 TIME_FORMAT = "{:02d}:{:02d}"
-SECONDS_PER_MINUTE = 60
+
+# background panel geometry
+PANEL_OFFSET_X = 260
+PANEL_Y = 362
+PANEL_WIDTH = 520
+PANEL_HEIGHT = 195
+PANEL_BORDER_RADIUS = 28
+
+# bunny geometry
+BUNNY_WIDTH = 340
+BUNNY_Y = 95
+BUNNY_SHADOW_WIDTH_RATIO = 0.62
+BUNNY_SHADOW_BASE_HEIGHT = 18
+BUNNY_SHADOW_OFFSET_RATIO = 0.4
+BUNNY_SHADOW_Y_ADJUST = 6
 
 
 class Button(QPushButton):
+    # rounded blossom-pink CTA button, tar0bunny-style
+
     def __init__(self, text, primary=True, parent=None):
         super().__init__(text, parent)
+        self.primary = primary
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(BUTTON_HEIGHT)
-        bg, bg_hover = (BLOSSOM, BLOSSOM_HOVER) if primary else (WHITE, WHITE_HOVER)
+        self.apply_style()
+
+    def apply_style(self):
+        if self.primary:
+            bg, bg_hover, fg = BLOSSOM.name(), BLOSSOM_HOVER, NAVY.name()
+        else:
+            bg, bg_hover, fg = SECONDARY_BUTTON_BG, SECONDARY_BUTTON_HOVER, NAVY.name()
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {bg};
-                color: {NAVY};
-                border: {BUTTON_BORDER_WIDTH}px solid {NAVY};
+                color: {fg};
+                border: {BUTTON_BORDER_WIDTH}px solid {NAVY.name()};
                 border-radius: {BUTTON_BORDER_RADIUS}px;
                 padding: 0 {BUTTON_PADDING_HORIZONTAL}px;
-                font-family: '{FONT_FAMILY}', '{FONT_FAMILY_FALLBACK}', {FONT_FAMILY_SANS};
+                font-family: '{FONT_FAMILY}', {FONT_FAMILY_SANS};
                 font-weight: {BUTTON_FONT_WEIGHT};
                 font-size: {BUTTON_FONT_SIZE}px;
             }}
@@ -112,147 +200,250 @@ class PomodoroWindow(QWidget):
         self.setWindowTitle(WINDOW_TITLE)
         self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
 
-        self.setStyleSheet(f"background-color: {LAVENDER};")
+        # assets
+        bg_path = ASSETS / BACKGROUND_FILENAME
+        bunny_path = ASSETS / BUNNY_FILENAME
+        self.bg_pixmap = QPixmap(str(bg_path))
+        self.bunny_pixmap = QPixmap(str(bunny_path))
 
+        missing = []
+        if self.bg_pixmap.isNull():
+            missing.append(str(bg_path))
+        if self.bunny_pixmap.isNull():
+            missing.append(str(bunny_path))
+        if missing:
+            raise FileNotFoundError(
+                ERROR_MESSAGE_HEADER + "\n  ".join(missing) + ERROR_MESSAGE_FOOTER
+            )
+
+        # chime sound, plays when a session finishes
+        self.chime = QSoundEffect(self)
+        chime_path = ASSETS / CHIME_FILENAME
+        if chime_path.exists():
+            self.chime.setSource(QUrl.fromLocalFile(str(chime_path)))
+            self.chime.setVolume(CHIME_VOLUME)
+
+        # script font for the session label
+        self.label_family = LABEL_FONT_FAMILY
+
+        # timer state
         self.mode = MODE_FOCUS
         self.seconds_left = FOCUS_SECONDS
         self.running = False
 
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.tick)
-        self.timer.setInterval(INTERVAL)
+        self.countdown_timer = QTimer(self)
+        self.countdown_timer.timeout.connect(self.tick)
+        self.countdown_timer.setInterval(TICK_INTERVAL_MS)
+
+        # bob animation state
+        self.bob_phase = 0.0
+        self.bob_amplitude = BOB_AMPLITUDE
+        self.bob_speed = BOB_SPEED
+        self.bob_idle_speed = BOB_IDLE_SPEED
+        self.anim_timer = QTimer(self)
+        self.anim_timer.timeout.connect(self.animate)
+        self.anim_timer.start(ANIMATION_INTERVAL_MS)
 
         self.build_ui()
 
+    # UI construction
     def build_ui(self):
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(UI_MARGIN, UI_MARGIN, UI_MARGIN, UI_MARGIN)
-        outer.setSpacing(SPACING)
-        outer.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-
-        self.session_label = QLabel(SESSION_LABEL_FOCUS_TEXT)
+        # session label, top of window
+        self.session_label = QLabel(self)
         self.session_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        session_font = QFont(FONT_FAMILY, SESSION_FONT_SIZE, QFont.Weight.Bold)
-        self.session_label.setFont(session_font)
-        self.session_label.setStyleSheet(f"color: {TWILIGHT};")
-        outer.addWidget(self.session_label)
-
-        self.bunny_label = QLabel()
-        bunny_path = ASSETS / BUNNY_FILENAME
-        if bunny_path.exists():
-            pix = QPixmap(str(bunny_path)).scaledToWidth(
-                BUNNY_SCALE_WIDTH, Qt.TransformationMode.SmoothTransformation
-            )
-            self.bunny_label.setPixmap(pix)
-        self.bunny_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        outer.addWidget(self.bunny_label)
-
-        # clock card
-        card = QFrame()
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {WHITE};
-                border: {CARD_BORDER_WIDTH}px solid {NAVY};
-                border-radius: {CARD_BORDER_RADIUS}px;
-            }}
-        """)
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(
-            CARD_MARGIN_LEFT, CARD_MARGIN_TOP, CARD_MARGIN_RIGHT, CARD_MARGIN_BOTTOM
+        self.session_label.setGeometry(
+            WINDOW_WIDTH // 2 - SESSION_LABEL_OFFSET_X, SESSION_LABEL_Y,
+            SESSION_LABEL_WIDTH, SESSION_LABEL_HEIGHT,
         )
-        card_layout.setSpacing(CARD_SPACING)
+        session_font = QFont(self.label_family, SESSION_FONT_SIZE)
+        self.session_label.setFont(session_font)
+        self.session_label.setStyleSheet(f"""
+            color: {WHITE.name()};
+            background: transparent;
+            border: none;
+        """)
+        session_shadow = QGraphicsDropShadowEffect(self)
+        session_shadow.setBlurRadius(SESSION_SHADOW_BLUR_RADIUS)
+        session_shadow.setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y)
+        session_shadow.setColor(QColor(SHADOW_COLOR_R, SHADOW_COLOR_G, SHADOW_COLOR_B, SESSION_SHADOW_ALPHA))
+        self.session_label.setGraphicsEffect(session_shadow)
 
-        self.time_label = QLabel(self.format_time())
+        # big countdown time
+        self.time_label = QLabel(self)
         self.time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.time_label.setGeometry(
+            WINDOW_WIDTH // 2 - TIME_LABEL_OFFSET_X, TIME_LABEL_Y,
+            TIME_LABEL_WIDTH, TIME_LABEL_HEIGHT,
+        )
         time_font = QFont(FONT_FAMILY, TIME_FONT_SIZE, QFont.Weight.Bold)
         self.time_label.setFont(time_font)
-        self.time_label.setStyleSheet(f"color: {NAVY}; border: none;")
-        card_layout.addWidget(self.time_label)
+        self.time_label.setStyleSheet(f"color: {WHITE.name()};")
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(TIME_SHADOW_BLUR_RADIUS)
+        shadow.setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y)
+        shadow.setColor(QColor(SHADOW_COLOR_R, SHADOW_COLOR_G, SHADOW_COLOR_B, TIME_SHADOW_ALPHA))
+        self.time_label.setGraphicsEffect(shadow)
 
-        tagline = QLabel(TAGLINE_TEXT)
-        tagline.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tagline.setFont(QFont(FONT_FAMILY, TAGLINE_FONT_SIZE, italic=True))
-        tagline.setStyleSheet(f"color: {TWILIGHT}; border: none;")
-        card_layout.addWidget(tagline)
+        # tagline under the clock
+        self.tag_label = QLabel(TAGLINE_TEXT, self)
+        self.tag_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.tag_label.setGeometry(
+            WINDOW_WIDTH // 2 - TAGLINE_OFFSET_X, TAGLINE_Y,
+            TAGLINE_WIDTH, TAGLINE_HEIGHT,
+        )
+        self.tag_label.setStyleSheet(f"""
+            color: {LAVENDER.name()};
+            font-family: '{FONT_FAMILY}', {FONT_FAMILY_SANS};
+            font-style: italic;
+            font-size: {TAGLINE_FONT_SIZE}px;
+        """)
 
-        outer.addWidget(card)
-
-        # buttons
-        row1 = QHBoxLayout()
-        row1.setSpacing(BUTTON_ROW_SPACING)
-        self.start_button = Button(START_BUTTON_START_TEXT, primary=True)
-        self.reset_button = Button(RESET_BUTTON_TEXT, primary=False)
+        # buttons row
+        self.start_button = Button(START_BUTTON_START_TEXT, primary=True, parent=self)
+        self.start_button.setGeometry(
+            WINDOW_WIDTH // 2 - START_BUTTON_OFFSET_X, BUTTON_ROW_Y,
+            START_BUTTON_WIDTH, BUTTON_HEIGHT,
+        )
         self.start_button.clicked.connect(self.toggle_running)
+
+        self.reset_button = Button(RESET_BUTTON_TEXT, primary=False, parent=self)
+        self.reset_button.setGeometry(
+            WINDOW_WIDTH // 2 - RESET_BUTTON_OFFSET_X, BUTTON_ROW_Y,
+            RESET_BUTTON_WIDTH, BUTTON_HEIGHT,
+        )
         self.reset_button.clicked.connect(self.reset)
-        row1.addWidget(self.start_button)
-        row1.addWidget(self.reset_button)
-        outer.addLayout(row1)
 
-        self.mode_button = Button(MODE_BUTTON_TO_BREAK_TEXT, primary=False)
+        self.mode_button = Button(MODE_BUTTON_BREAK_TEXT, primary=False, parent=self)
+        self.mode_button.setGeometry(
+            WINDOW_WIDTH // 2 + MODE_BUTTON_OFFSET_X, BUTTON_ROW_Y,
+            MODE_BUTTON_WIDTH, BUTTON_HEIGHT,
+        )
         self.mode_button.clicked.connect(self.switch_mode)
-        outer.addWidget(self.mode_button)
 
-    # timer control
+        self.refresh_labels()
+
+    # timer logic
     def toggle_running(self):
         self.running = not self.running
         if self.running:
-            self.timer.start()
+            self.countdown_timer.start()
             self.start_button.setText(START_BUTTON_PAUSE_TEXT)
         else:
-            self.timer.stop()
+            self.countdown_timer.stop()
             self.start_button.setText(START_BUTTON_START_TEXT)
 
     def tick(self):
         if self.seconds_left > 0:
             self.seconds_left -= 1
-            self._refresh()
+            self.refresh_labels()
         else:
-            self._session_complete()
+            self.session_complete()
 
     def session_complete(self):
-        self.timer.stop()
+        self.countdown_timer.stop()
         self.running = False
         self.start_button.setText(START_BUTTON_START_TEXT)
+        if self.chime.isLoaded() or self.chime.source().isValid():
+            self.chime.play()
+        # flip mode and auto-start the next session
         self.mode = MODE_BREAK if self.mode == MODE_FOCUS else MODE_FOCUS
         self.seconds_left = BREAK_SECONDS if self.mode == MODE_BREAK else FOCUS_SECONDS
-        self.refresh()
+        self.refresh_labels()
         self.toggle_running()
 
     def reset(self):
-        self.timer.stop()
+        # always snaps back to a fresh focus session
+        self.countdown_timer.stop()
         self.running = False
         self.start_button.setText(START_BUTTON_START_TEXT)
         self.mode = MODE_FOCUS
         self.seconds_left = FOCUS_SECONDS
-        self.refresh()
+        self.refresh_labels()
 
     def switch_mode(self):
-        self.timer.stop()
+        # one-click focus/break switch, works at any point
+        self.countdown_timer.stop()
         self.running = False
         self.start_button.setText(START_BUTTON_START_TEXT)
         self.mode = MODE_BREAK if self.mode == MODE_FOCUS else MODE_FOCUS
         self.seconds_left = BREAK_SECONDS if self.mode == MODE_BREAK else FOCUS_SECONDS
-        self.refresh()
+        self.refresh_labels()
 
-    # display
-    def format_time(self):
-        minutes, seconds = divmod(self.seconds_left, SECONDS_PER_MINUTE)
-        return TIME_FORMAT.format(minutes, seconds)
-
-    def refresh(self):
-        self.time_label.setText(self.format_time())
+    def refresh_labels(self):
+        mins, secs = divmod(self.seconds_left, SECONDS_PER_MINUTE)
+        self.time_label.setText(TIME_FORMAT.format(mins, secs))
         if self.mode == MODE_FOCUS:
             self.session_label.setText(SESSION_LABEL_FOCUS_TEXT)
-            self.mode_button.setText(MODE_BUTTON_TO_BREAK_TEXT)
+            self.mode_button.setText(MODE_BUTTON_BREAK_SHORT_TEXT)
         else:
             self.session_label.setText(SESSION_LABEL_BREAK_TEXT)
-            self.mode_button.setText(MODE_BUTTON_TO_FOCUS_TEXT)
+            self.mode_button.setText(MODE_BUTTON_FOCUS_SHORT_TEXT)
+
+    # bunny bob animation
+    def animate(self):
+        speed = self.bob_speed if self.running else self.bob_idle_speed
+        amp = self.bob_amplitude if self.running else self.bob_amplitude * BOB_IDLE_AMPLITUDE_RATIO
+        self.bob_phase += speed
+        self.current_bob_offset = amp * math.sin(self.bob_phase)
+        self.update()
+
+    # painting
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # background, scaled and cropped to fill window
+        scaled = self.bg_pixmap.scaled(
+            WINDOW_WIDTH, WINDOW_HEIGHT,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        x_off = (scaled.width() - WINDOW_WIDTH) // 2
+        y_off = (scaled.height() - WINDOW_HEIGHT) // 2
+        painter.drawPixmap(0, 0, scaled, x_off, y_off, WINDOW_WIDTH, WINDOW_HEIGHT)
+
+        # soft rounded panel behind the clock/buttons area
+        panel = QPainterPath()
+        panel_rect = QRectF(WINDOW_WIDTH / 2 - PANEL_OFFSET_X, PANEL_Y, PANEL_WIDTH, PANEL_HEIGHT)
+        panel.addRoundedRect(panel_rect, PANEL_BORDER_RADIUS, PANEL_BORDER_RADIUS)
+        painter.fillPath(panel, QColor(SHADOW_COLOR_R, SHADOW_COLOR_G, SHADOW_COLOR_B, PANEL_ALPHA))
+
+        # bunny mascot, bobbing over the lake
+        bunny_w = BUNNY_WIDTH
+        bunny_h = int(bunny_w * self.bunny_pixmap.height() / self.bunny_pixmap.width())
+        bunny_scaled = self.bunny_pixmap.scaled(
+            bunny_w, bunny_h,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        offset = getattr(self, "current_bob_offset", 0.0)
+        bx = WINDOW_WIDTH // 2 - bunny_w // 2
+        by = BUNNY_Y + offset
+
+        # soft blossom-pink glow shadow beneath the bunny
+        shadow_w = bunny_w * BUNNY_SHADOW_WIDTH_RATIO
+        shadow_h = BUNNY_SHADOW_BASE_HEIGHT + max(0, offset) * BUNNY_SHADOW_OFFSET_RATIO
+        shadow_path = QPainterPath()
+        shadow_cx = WINDOW_WIDTH / 2
+        shadow_cy = by + bunny_h - BUNNY_SHADOW_Y_ADJUST
+        shadow_path.addEllipse(QPointF(shadow_cx, shadow_cy), shadow_w / 2, shadow_h / 2)
+        painter.fillPath(shadow_path, QColor(SHADOW_COLOR_R, SHADOW_COLOR_G, SHADOW_COLOR_B, BUNNY_SHADOW_ALPHA))
+
+        painter.drawPixmap(int(bx), int(by), bunny_scaled)
+
+        painter.end()
 
 
 def main():
     app = QApplication(sys.argv)
     app.setStyle(APP_STYLE)
-    win = PomodoroWindow()
+    try:
+        win = PomodoroWindow()
+    except FileNotFoundError as e:
+        # show this even on a double-clicked .py with no visible console
+        QMessageBox.critical(None, MISSING_FILES_DIALOG_TITLE, str(e))
+        sys.exit(1)
     win.show()
     sys.exit(app.exec())
 
