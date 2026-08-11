@@ -376,29 +376,6 @@ class PomodoroWindow(QWidget):
         panel.addRoundedRect(panel_rect, PANEL_BORDER_RADIUS, PANEL_BORDER_RADIUS)
         painter.fillPath(panel, QColor(SHADOW_COLOR_R, SHADOW_COLOR_G, SHADOW_COLOR_B, PANEL_ALPHA))
 
-        # bunny mascot, bobbing over the lake
-        bunny_w = BUNNY_WIDTH
-        bunny_h = int(bunny_w * self.bunny_pixmap.height() / self.bunny_pixmap.width())
-        bunny_scaled = self.bunny_pixmap.scaled(
-            bunny_w, bunny_h,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        offset = getattr(self, "current_bob_offset", 0.0)
-        bx = WINDOW_WIDTH // 2 - bunny_w // 2
-        by = BUNNY_Y + offset
-
-        # soft blossom-pink glow shadow beneath the bunny
-        shadow_w = bunny_w * BUNNY_SHADOW_WIDTH_RATIO
-        shadow_h = BUNNY_SHADOW_BASE_HEIGHT + max(0, offset) * BUNNY_SHADOW_OFFSET_RATIO
-        shadow_path = QPainterPath()
-        shadow_cx = WINDOW_WIDTH / 2
-        shadow_cy = by + bunny_h - BUNNY_SHADOW_Y_ADJUST
-        shadow_path.addEllipse(QPointF(shadow_cx, shadow_cy), shadow_w / 2, shadow_h / 2)
-        painter.fillPath(shadow_path, QColor(SHADOW_COLOR_R, SHADOW_COLOR_G, SHADOW_COLOR_B, BUNNY_SHADOW_ALPHA))
-
-        painter.drawPixmap(int(bx), int(by), bunny_scaled)
-
         painter.end()
 
 
